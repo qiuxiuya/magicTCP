@@ -13,16 +13,16 @@ _________________________________________________
 
 install_magictcp_kernel(){
     magictcp_kernel_version="6.1.55-magictcp001"
-    apt install -y wget > /dev/null 2>&1
-    wget "https://raw.githubusercontent.com/qiuxiuya/magicTCP/main/kernel/linux-headers-${magictcp_kernel_version}_${magictcp_kernel_version}-4_amd64.deb" -O "linux-headers-${magictcp_kernel_version}.deb" > /dev/null 2>&1
-    wget "https://raw.githubusercontent.com/qiuxiuya/magicTCP/main/kernel/linux-image-${magictcp_kernel_version}_${magictcp_kernel_version}-4_amd64.deb" -O "linux-image-${magictcp_kernel_version}.deb" > /dev/null 2>&1
-    dpkg -i "linux-headers-${magictcp_kernel_version}.deb" > /dev/null 2>&1
-    dpkg -i "linux-image-${magictcp_kernel_version}.deb" > /dev/null 2>&1
+    apt install -y wget
+    wget "https://raw.githubusercontent.com/qiuxiuya/magicTCP/main/kernel/linux-headers-${magictcp_kernel_version}_${magictcp_kernel_version}-4_amd64.deb" -O "linux-headers-${magictcp_kernel_version}.deb"
+    wget "https://raw.githubusercontent.com/qiuxiuya/magicTCP/main/kernel/linux-image-${magictcp_kernel_version}_${magictcp_kernel_version}-4_amd64.deb" -O "linux-image-${magictcp_kernel_version}.deb"
+    dpkg -i "linux-headers-${magictcp_kernel_version}.deb"
+    dpkg -i "linux-image-${magictcp_kernel_version}.deb"
     rm -rf "linux-headers-${magictcp_kernel_version}.deb"
     rm -rf "linux-image-${magictcp_kernel_version}.deb"
 
-    update-initramfs -c -k ${magictcp_kernel_version} > /dev/null 2>&1
-    update-grub > /dev/null 2>&1
+    update-initramfs -c -k ${magictcp_kernel_version}
+    update-grub
     reboot
 }
 
@@ -61,12 +61,12 @@ apply_tcp_optimization(){
     done
 
     echo "3" > /proc/sys/net/ipv4/tcp_fastopen
-    sysctl -p > /dev/null 2>&1
+    sysctl -p
 }
 
 uninstall_other_kernels(){
-    sudo dpkg --list | grep linux-image | grep -v 'magic' | awk '{print $2}' | xargs sudo apt-get remove --purge -y > /dev/null 2>&1
-    sudo update-grub > /dev/null 2>&1
+    sudo dpkg --list | grep linux-image | grep -v 'magic' | awk '{print $2}' | xargs sudo apt-get remove --purge -y
+    sudo update-grub
 }
 
 echo "1. Install magicTCP kernel"
