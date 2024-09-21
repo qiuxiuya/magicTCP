@@ -1,6 +1,7 @@
 # magicTCP
 
-This script aims to optimise TCP performance between two hosts.
+Changed From 
+[nexstorm/magicTCP](https://github.com/nexstorm/magicTCP)
 
 ## Usage
 ```shell
