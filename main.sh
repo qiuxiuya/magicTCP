@@ -1,28 +1,28 @@
 #!/bin/bash
 
 echo """\
-                         __                     
-   ____  ___  _  _______/ /_____  _________ ___ 
+                         __                     
+   ____  ___  _  _______/ /_____  _________ ___ 
   / __ \/ _ \| |/_/ ___/ __/ __ \/ ___/ __ \__ \\
  / / / /  __/>  <(__  ) /_/ /_/ / /  / / / / / /
-/_/ /_/\___/_/|_/____/\__/\____/_/  /_/ /_/ /_/ 
+/_/ /_/\___/_/|_/____/\__/\____/_/  /_/ /_/ /_/ 
 _________________________________________________
         magicTCP v0.1 | 25/09/2023 edition
 
 """
 
 install_magictcp_kernel(){
-magictcp_kernel_version="6.1.55-magictcp001"
-    apt install -y wget
-    wget "https://raw.githubusercontent.com/nexstorm/magicTCP/main/kernel/linux-headers-${magictcp_kernel_version}_${magictcp_kernel_version}-4_amd64.deb" -O "linux-headers-${magictcp_kernel_version}.deb"
-    wget "https://raw.githubusercontent.com/nexstorm/magicTCP/main/kernel/linux-image-${magictcp_kernel_version}_${magictcp_kernel_version}-4_amd64.deb" -O "linux-image-${magictcp_kernel_version}.deb"
-    dpkg -i "linux-headers-${magictcp_kernel_version}.deb"
-    dpkg -i "linux-image-${magictcp_kernel_version}.deb"
+    magictcp_kernel_version="6.1.55-magictcp001"
+    apt install -y wget > /dev/null 2>&1
+    wget "https://raw.githubusercontent.com/qiuxiuya/magicTCP/main/kernel/linux-headers-${magictcp_kernel_version}_${magictcp_kernel_version}-4_amd64.deb" -O "linux-headers-${magictcp_kernel_version}.deb" > /dev/null 2>&1
+    wget "https://raw.githubusercontent.com/qiuxiuya/magicTCP/main/kernel/linux-image-${magictcp_kernel_version}_${magictcp_kernel_version}-4_amd64.deb" -O "linux-image-${magictcp_kernel_version}.deb" > /dev/null 2>&1
+    dpkg -i "linux-headers-${magictcp_kernel_version}.deb" > /dev/null 2>&1
+    dpkg -i "linux-image-${magictcp_kernel_version}.deb" > /dev/null 2>&1
     rm -rf "linux-headers-${magictcp_kernel_version}.deb"
     rm -rf "linux-image-${magictcp_kernel_version}.deb"
 
-    update-initramfs -c -k ${magictcp_kernel_version}
-    update-grub
+    update-initramfs -c -k ${magictcp_kernel_version} > /dev/null 2>&1
+    update-grub > /dev/null 2>&1
     reboot
 }
 
@@ -48,7 +48,6 @@ apply_tcp_optimization(){
         ["net.core.optmem_max"]="65535"
         ["net.ipv4.udp_mem"]="8192 262144 536870912"
         ["net.core.netdev_max_backlog"]="30000"
-
     )
 
     cp /etc/sysctl.conf /etc/sysctl.conf.bak
@@ -61,24 +60,33 @@ apply_tcp_optimization(){
         fi
     done
 
-    sysctl -p
+    echo "3" > /proc/sys/net/ipv4/tcp_fastopen
+    sysctl -p > /dev/null 2>&1
+}
+
+uninstall_other_kernels(){
+    sudo dpkg --list | grep linux-image | grep -v 'magic' | awk '{print $2}' | xargs sudo apt-get remove --purge -y > /dev/null 2>&1
+    sudo update-grub > /dev/null 2>&1
 }
 
 echo "1. Install magicTCP kernel"
 echo "2. Apply TCP optimization"
+echo "3. Uninstall other kernel"
 
 read -p "Please select :" num
-  case "$num" in
-  1)
+case "$num" in
+1)
     install_magictcp_kernel
     ;;
-  2)
+2)
     apply_tcp_optimization
     ;;
-  *)
-  clear
-    echo -e "${Error}:Please select a valid option [1, 2]"
+3)
+    uninstall_other_kernels
+    ;;
+*)
+    clear
+    echo -e "${Error}:Please select a valid option [1, 2, 3]"
     exit 1
     ;;
-  esac
-                                                
+esac
