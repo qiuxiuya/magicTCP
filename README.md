@@ -4,7 +4,7 @@ This script aims to optimise TCP performance between two hosts.
 
 ## Usage
 ```shell
-bash <(curl -sSL https://raw.githubusercontent.com/nexstorm/magicTCP/main/main.sh)
+bash <(curl -sSL https://raw.githubusercontent.com/qiuxiuya/magicTCP/main/main.sh)
 ```
 
 ## Minimum requirements
