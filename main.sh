@@ -62,7 +62,8 @@ apply_tcp_optimization(){
 
     echo "3" > /proc/sys/net/ipv4/tcp_fastopen
     sysctl -p
-    sed -i 's/#precedence ::ffff:0:0\/96  100/precedence ::ffff:0:0\/96  100/' /etc/gai.conf
+    
+grep -q '^precedence ::ffff:0:0/96  100' /etc/gai.conf || echo 'precedence ::ffff:0:0/96  100' >> /etc/gai.conf
 }
 
 uninstall_other_kernels(){
