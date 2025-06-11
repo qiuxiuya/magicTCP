@@ -65,7 +65,7 @@ apply_tcp_optimization() {
         else
             echo "$param = $value" >> /etc/sysctl.conf
         fi
-        sysctl -w "$param=$value" >/dev/null 2>&1
+        sysctl -w "$param=$value"
     done
 
     grep -q '^precedence ::ffff:0:0/96  100' /etc/gai.conf || echo 'precedence ::ffff:0:0/96  100' >> /etc/gai.conf
