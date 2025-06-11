@@ -1,11 +1,11 @@
 #!/bin/bash
 
 echo """\
-                         __                     
-   ____  ___  _  _______/ /_____  _________ ___ 
+                         __                    
+   ____  ___  _  _______/ /_____  _________ ___ 
   / __ \/ _ \| |/_/ ___/ __/ __ \/ ___/ __ \__ \\
  / / / /  __/>  <(__  ) /_/ /_/ / /  / / / / / /
-/_/ /_/\___/_/|_/____/\__/\____/_/  /_/ /_/ /_/ 
+/_/ /_/\___/_/|_/____/\__/\____/_/  /_/ /_/ /_/ 
 _________________________________________________
         magicTCP v0.1 | 12/06/2025 edition
 
@@ -57,17 +57,18 @@ apply_tcp_optimization() {
     )
 
     cp /etc/sysctl.conf /etc/sysctl.conf.bak
+
     for param in "${!params[@]}"; do
+        value="${params[$param]}"
         if grep -q "^$param" /etc/sysctl.conf; then
-            sed -i "s|^$param.*|$param = ${params[$param]}|" /etc/sysctl.conf
+            sed -i "s|^$param.*|$param = $value|" /etc/sysctl.conf
         else
-            echo "$param = ${params[$param]}" >>/etc/sysctl.conf
+            echo "$param = $value" >> /etc/sysctl.conf
         fi
+        sysctl -w "$param=$value" >/dev/null 2>&1
     done
 
-    sysctl -p
-
-    grep -q '^precedence ::ffff:0:0/96  100' /etc/gai.conf || echo 'precedence ::ffff:0:0/96  100' >>/etc/gai.conf
+    grep -q '^precedence ::ffff:0:0/96  100' /etc/gai.conf || echo 'precedence ::ffff:0:0/96  100' >> /etc/gai.conf
 }
 
 uninstall_other_kernels() {
