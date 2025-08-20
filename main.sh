@@ -46,7 +46,6 @@ apply_tcp_optimization() {
         ["net.ipv4.tcp_max_syn_backlog"]="8192"
         ["net.ipv4.tcp_fin_timeout"]="10"
         ["net.ipv4.tcp_tw_reuse"]="1"
-        ["net.ipv4.tcp_tw_recycle"]="0"
         ["net.ipv4.udp_rmem_min"]="4096"
         ["net.ipv4.udp_wmem_min"]="4096"
     )
