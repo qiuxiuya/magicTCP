@@ -3,11 +3,11 @@
 echo """\
                          __                    
    ____  ___  _  _______/ /_____  _________ ___ 
-  / __ \/ _ \| |/_/ ___/ __/ __ \/ ___/ __ \__ \
+  / __ \/ _ \| |/_/ ___/ __/ __ \/ ___/ __ \__ \\
  / / / /  __/>  <(__  ) /_/ /_/ / /  / / / / / /
 /_/ /_/\___/_/|_/____/\__/\____/_/  /_/ /_/ /_/ 
 _________________________________________________
-        magicTCP v0.1 | 20/08/2025 edition
+        magicTCP v0.1 | 12/06/2025 edition
 
 """
 
@@ -28,26 +28,32 @@ install_magictcp_kernel() {
 
 apply_tcp_optimization() {
     declare -A params=(
-        ["net.core.rmem_max"]="67108864"
-        ["net.core.wmem_max"]="67108864"
-        ["net.ipv4.tcp_rmem"]="4096 87380 67108864"
-        ["net.ipv4.tcp_wmem"]="4096 65536 67108864"
-        ["net.core.optmem_max"]="65536"
-        ["net.ipv4.tcp_mtu_probing"]="1"
-        ["net.ipv4.tcp_slow_start_after_idle"]="0"
-        ["net.ipv4.tcp_fastopen"]="3"
+        ["net.ipv4.tcp_rmem"]="8192 262144 536870912"
+        ["net.ipv4.tcp_wmem"]="8192 262144 536870912"
+        ["net.ipv4.tcp_collapse_max_bytes"]="6291456"
+        ["net.ipv4.tcp_notsent_lowat"]="131072"
+        ["net.ipv4.tcp_adv_win_scale"]="1"
+        ["net.core.default_qdisc"]="fq"
+        ["net.ipv4.tcp_congestion_control"]="bbr"
         ["net.ipv4.tcp_window_scaling"]="1"
-        ["net.ipv4.tcp_timestamps"]="1"
-        ["net.ipv4.tcp_sack"]="1"
-        ["net.ipv4.tcp_no_metrics_save"]="1"
-        ["net.ipv4.tcp_low_latency"]="1"
-        ["net.ipv4.tcp_adv_win_scale"]="-2"
-        ["net.core.netdev_max_backlog"]="16384"
-        ["net.ipv4.tcp_max_syn_backlog"]="8192"
-        ["net.ipv4.tcp_fin_timeout"]="10"
+        ["net.ipv4.conf.all.route_localnet"]="1"
+        ["net.ipv4.ip_forward"]="1"
+        ["net.ipv4.conf.all.forwarding"]="1"
+        ["net.ipv4.conf.default.forwarding"]="1"
+        ["net.ipv4.udp_rmem_min"]="16384"
+        ["net.ipv4.udp_wmem_min"]="16384"
+        ["net.core.rmem_default"]="262144"
+        ["net.core.rmem_max"]="2621440"
+        ["net.core.wmem_default"]="262144"
+        ["net.core.wmem_max"]="2621440"
+        ["net.core.optmem_max"]="65535"
+        ["net.ipv4.udp_mem"]="8192 262144 524288"
+        ["net.core.netdev_max_backlog"]="30000"
+        ["net.ipv4.tcp_fastopen"]="3"
+        ["net.ipv4.tcp_mtu_probing"]="1"
+        ["net.ipv4.tcp_mem"]="786432 1048576 26777216"
         ["net.ipv4.tcp_tw_reuse"]="1"
-        ["net.ipv4.udp_rmem_min"]="4096"
-        ["net.ipv4.udp_wmem_min"]="4096"
+        ["net.ipv4.tcp_fin_timeout"]="15"
     )
 
     cp /etc/sysctl.conf /etc/sysctl.conf.bak
@@ -76,18 +82,18 @@ echo "3. Uninstall other kernel"
 
 read -p "Please select :" num
 case "$num" in
-    1)
-        install_magictcp_kernel
-        ;;
-    2)
-        apply_tcp_optimization
-        ;;
-    3)
-        uninstall_other_kernels
-        ;;
-    *)
-        clear
-        echo -e "${Error}:Please select a valid option [1, 2, 3]"
-        exit 1
-        ;;
+1)
+    install_magictcp_kernel
+    ;;
+2)
+    apply_tcp_optimization
+    ;;
+3)
+    uninstall_other_kernels
+    ;;
+*)
+    clear
+    echo -e "${Error}:Please select a valid option [1, 2, 3]"
+    exit 1
+    ;;
 esac
