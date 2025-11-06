@@ -42,18 +42,11 @@ apply_tcp_optimization() {
         ["net.ipv4.conf.default.forwarding"]="1"
         ["net.ipv4.udp_rmem_min"]="16384"
         ["net.ipv4.udp_wmem_min"]="16384"
-        ["net.core.rmem_default"]="262144"
-        ["net.core.rmem_max"]="2621440"
-        ["net.core.wmem_default"]="262144"
-        ["net.core.wmem_max"]="2621440"
+        ["net.core.rmem_default"]="26214400"
+        ["net.core.rmem_max"]="26214400"
         ["net.core.optmem_max"]="65535"
-        ["net.ipv4.udp_mem"]="8192 262144 524288"
+        ["net.ipv4.udp_mem"]="8192 262144 536870912"
         ["net.core.netdev_max_backlog"]="30000"
-        ["net.ipv4.tcp_fastopen"]="3"
-        ["net.ipv4.tcp_mtu_probing"]="1"
-        ["net.ipv4.tcp_mem"]="786432 1048576 26777216"
-        ["net.ipv4.tcp_tw_reuse"]="1"
-        ["net.ipv4.tcp_fin_timeout"]="15"
     )
 
     cp /etc/sysctl.conf /etc/sysctl.conf.bak
@@ -72,8 +65,8 @@ apply_tcp_optimization() {
 }
 
 uninstall_other_kernels() {
-    sudo dpkg --list | grep linux-image | grep -v 'magic' | awk '{print $2}' | xargs sudo apt-get remove --purge -y
-    sudo update-grub
+    dpkg --list | grep linux-image | grep -v 'magic' | awk '{print $2}' | xargs apt-get remove --purge -y
+    update-grub
 }
 
 echo "1. Install magicTCP kernel"
