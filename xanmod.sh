@@ -1,6 +1,5 @@
-apt install -y wget
-
 install_xanmod_kernel() {
+    apt install -y wget
     LEVEL=$(awk '
 BEGIN {
     while (!/flags/) if (getline < "/proc/cpuinfo" != 1) exit 1
