@@ -42,7 +42,7 @@ rm -rf "$WORKDIR"
 
 update-initramfs -c -k all
 update-grub
-
+reboot
 }
 
 apply_tcp_optimization() {
