@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-
 apt install -y wget
 
 install_xanmod_kernel() {
@@ -36,7 +34,7 @@ else
 fi
 
 for u in "${URLS[@]}"; do
-    wget -q "$u"
+    wget "$u"
 done
 
 dpkg -i ./*.deb
@@ -58,7 +56,7 @@ apply_tcp_optimization() {
 
     for param in "${!params[@]}"; do
         value="${params[$param]}"
-        if grep -q "^$param" /etc/sysctl.conf; then
+        if grep "^$param" /etc/sysctl.conf; then
             sed -i "s|^$param.*|$param = $value|" /etc/sysctl.conf
         else
             echo "$param = $value" >> /etc/sysctl.conf
@@ -66,7 +64,7 @@ apply_tcp_optimization() {
         sysctl -w "$param=$value"
     done
 
-    grep -q '^precedence ::ffff:0:0/96  100' /etc/gai.conf || echo 'precedence ::ffff:0:0/96  100' >> /etc/gai.conf
+    grep '^precedence ::ffff:0:0/96  100' /etc/gai.conf || echo 'precedence ::ffff:0:0/96  100' >> /etc/gai.conf
 }
 
 uninstall_other_kernels() {
