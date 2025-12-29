@@ -17,15 +17,15 @@ cd "$WORKDIR"
 
 if [ "$LEVEL" = "2" ]; then
     URLS=(
-        "https://github.com/qiuxiuya/magicTCP/raw/refs/heads/main/kernel/xanmod-x86v2/linux-headers-6.12.62-rt-x64v2-xanmod1_6.12.62-rt-x64v2-xanmod1-0~20251213.g168fc65_amd64.deb"
-        "https://github.com/qiuxiuya/magicTCP/raw/refs/heads/main/kernel/xanmod-x86v2/linux-image-6.12.62-rt-x64v2-xanmod1_6.12.62-rt-x64v2-xanmod1-0~20251213.g168fc65_amd64.deb"
-        "https://github.com/qiuxiuya/magicTCP/raw/refs/heads/main/kernel/xanmod-x86v2/linux-xanmod-rt-x64v2_6.12.62-rt-xanmod1-0_amd64.deb"
+        "https://raw.githubusercontent.com/qiuxiuya/magicTCP/refs/heads/main/kernel/xanmod-x86v2/linux-headers-6.12.62-rt-x64v2-xanmod1_6.12.62-rt-x64v2-xanmod1-0~20251213.g168fc65_amd64.deb"
+        "https://raw.githubusercontent.com/qiuxiuya/magicTCP/refs/heads/main/kernel/xanmod-x86v2/linux-image-6.12.62-rt-x64v2-xanmod1_6.12.62-rt-x64v2-xanmod1-0~20251213.g168fc65_amd64.deb"
+        "https://raw.githubusercontent.com/qiuxiuya/magicTCP/refs/heads/main/kernel/xanmod-x86v2/linux-xanmod-rt-x64v2_6.12.62-rt-xanmod1-0_amd64.deb"
     )
 elif [ "$LEVEL" = "3" ] || [ "$LEVEL" = "4" ]; then
     URLS=(
-        "https://github.com/qiuxiuya/magicTCP/raw/refs/heads/main/kernel/xanmod-x86v3/linux-headers-6.12.62-rt-x64v3-xanmod1_6.12.62-rt-x64v3-xanmod1-0~20251213.g168fc65_amd64.deb"
-        "https://github.com/qiuxiuya/magicTCP/raw/refs/heads/main/kernel/xanmod-x86v3/linux-image-6.12.62-rt-x64v3-xanmod1_6.12.62-rt-x64v3-xanmod1-0~20251213.g168fc65_amd64.deb"
-        "https://github.com/qiuxiuya/magicTCP/raw/refs/heads/main/kernel/xanmod-x86v3/linux-xanmod-rt-x64v3_6.12.62-rt-xanmod1-0_amd64.deb"
+        "https://raw.githubusercontent.com/qiuxiuya/magicTCP/refs/heads/main/kernel/xanmod-x86v3/linux-headers-6.12.62-rt-x64v3-xanmod1_6.12.62-rt-x64v3-xanmod1-0~20251213.g168fc65_amd64.deb"
+        "https://raw.githubusercontent.com/qiuxiuya/magicTCP/refs/heads/main/kernel/xanmod-x86v3/linux-image-6.12.62-rt-x64v3-xanmod1_6.12.62-rt-x64v3-xanmod1-0~20251213.g168fc65_amd64.deb"
+        "https://raw.githubusercontent.com/qiuxiuya/magicTCP/refs/heads/main/kernel/xanmod-x86v3/linux-xanmod-rt-x64v3_6.12.62-rt-xanmod1-0_amd64.deb"
     )
 else
     echo "CPU x86-64-v$LEVEL not support"
