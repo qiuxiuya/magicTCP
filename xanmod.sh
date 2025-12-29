@@ -2,8 +2,6 @@
 
 apt install -y wget
 
-set -e
-
 install_xanmod_kernel() {
     LEVEL=$(awk '
 BEGIN {
