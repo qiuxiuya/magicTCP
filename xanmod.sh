@@ -40,7 +40,10 @@ dpkg -i ./*.deb
 cd /
 rm -rf "$WORKDIR"
 
-update-initramfs -c -k all
+for kver in $(ls /lib/modules | grep xanmod); do
+    update-initramfs -c -k "$kver"
+done
+
 update-grub
 reboot
 }
