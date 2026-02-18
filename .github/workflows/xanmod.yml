@@ -1,0 +1,58 @@
+name: Sync Latest XanMod RT Kernel
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+jobs:
+  sync-latest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl xmlstarlet
+
+      - name: Get latest RT version from RSS
+        id: getver
+        run: |
+          RSS_URL="https://sourceforge.net/p/xanmod/activity/feed.rss"
+          VERSION=$(curl -s "$RSS_URL" \
+            | xmlstarlet sel -t -v "//item/title[contains(.,'rt')][1]" \
+            | grep -oP '\d+\.\d+\.\d+-rt\d+')
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Latest RT version: $VERSION"
+
+      - name: Download latest deb packages
+        run: |
+          VERSION=${{ steps.getver.outputs.version }}
+
+          mkdir -p kernel/x64v2
+          mkdir -p kernel/x64v3
+
+          BASE_URL="https://sourceforge.net/projects/xanmod/files/releases"
+
+          curl -L -o kernel/x64v2/linux-image.deb \
+            "$BASE_URL/${VERSION}/linux-image-${VERSION}-x64v2.deb/download"
+
+          curl -L -o kernel/x64v3/linux-image.deb \
+            "$BASE_URL/${VERSION}/linux-image-${VERSION}-x64v3.deb/download"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add kernel/x64v2/linux-image.deb kernel/x64v3/linux-image.deb
+
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Update latest XanMod RT kernel"
+            git push
