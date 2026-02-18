@@ -13,77 +13,114 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Parse RSS and download latest RT kernels
+      - name: Parse RSS feed and extract URLs
+        id: parse_rss
         run: |
           set -e
 
-          # 获取 RSS feed
-          RSS=$(curl -fsSL "https://sourceforge.net/p/xanmod/activity/feed.rss")
+          echo "Fetching RSS feed..."
+          RSS=$(curl -fsSL "https://sourceforge.net/p/xanmod/activity/feed")
 
-          # 打印 RSS 内容用于调试
-          echo "=== RSS Content (first 100 lines) ==="
-          echo "$RSS" | head -100
+          # 提取 .changes/download 链接
+          LINKS=$(echo "$RSS" | grep -oP 'https://sourceforge\.net/projects/xanmod/files/releases/rt/[^"<>\s]+\.changes/download' | sort -u)
 
-          # 从 RSS 中直接提取所有 .deb/download 链接
-          ALL_DEBS=$(echo "$RSS" | grep -oP 'https://sourceforge\.net/projects/xanmod/files/[^"<\s]+\.deb/download' | sort -u)
+          if [ -z "$LINKS" ]; then
+            # 尝试从 <link> 标签中提取
+            LINKS=$(echo "$RSS" | grep -oP '(?<=<link>)[^<]+releases/rt/[^<]+\.changes/download(?=</link>)' | sort -u)
+          fi
 
-          echo ""
-          echo "=== All .deb links found ==="
-          echo "$ALL_DEBS"
-
-          # 筛选 rt x64v3 相关的 deb（image / headers / libc-dev）
-          IMAGE_V3=$(echo  "$ALL_DEBS" | grep 'x64v3' | grep 'linux-image'   | sort -V | tail -n1)
-          HEADERS_V3=$(echo "$ALL_DEBS" | grep 'x64v3' | grep 'linux-headers' | sort -V | tail -n1)
-          LIBC_V3=$(echo   "$ALL_DEBS" | grep 'x64v3' | grep 'linux-libc-dev' | sort -V | tail -n1)
-
-          # 筛选 rt x64v2 相关的 deb
-          IMAGE_V2=$(echo  "$ALL_DEBS" | grep 'x64v2' | grep 'linux-image'   | sort -V | tail -n1)
-          HEADERS_V2=$(echo "$ALL_DEBS" | grep 'x64v2' | grep 'linux-headers' | sort -V | tail -n1)
-          LIBC_V2=$(echo   "$ALL_DEBS" | grep 'x64v2' | grep 'linux-libc-dev' | sort -V | tail -n1)
-
-          echo ""
-          echo "=== x64v3 URLs ==="
-          echo "Image:   $IMAGE_V3"
-          echo "Headers: $HEADERS_V3"
-          echo "LibcDev: $LIBC_V3"
-
-          echo ""
-          echo "=== x64v2 URLs ==="
-          echo "Image:   $IMAGE_V2"
-          echo "Headers: $HEADERS_V2"
-          echo "LibcDev: $LIBC_V2"
-
-          # 检查是否找到了链接
-          if [ -z "$IMAGE_V3" ] || [ -z "$IMAGE_V2" ]; then
-            echo ""
-            echo "ERROR: Could not find deb links. Dumping full RSS for inspection:"
+          if [ -z "$LINKS" ]; then
+            echo "ERROR: No .changes/download links found"
             echo "$RSS"
             exit 1
           fi
 
-          # 创建输出目录
+          echo "=== Found .changes links ==="
+          echo "$LINKS"
+
+          LINK_V3=$(echo "$LINKS" | grep 'x64v3' | sort -V | tail -n1)
+          LINK_V2=$(echo "$LINKS" | grep 'x64v2' | sort -V | tail -n1)
+
+          echo "Latest x64v3: $LINK_V3"
+          echo "Latest x64v2: $LINK_V2"
+
+          if [ -z "$LINK_V3" ] || [ -z "$LINK_V2" ]; then
+            echo "ERROR: Could not find x64v3 or x64v2 links"
+            exit 1
+          fi
+
+          # 解析 x64v3
+          BASE_DIR_V3=$(echo "$LINK_V3" | grep -oP '.+(?=/linux-upstream_)')
+          VERSION_STR_V3=$(echo "$LINK_V3" | grep -oP '(?<=linux-upstream_)[^/]+(?=\.changes)')
+          KERNEL_NAME_V3=$(echo "$BASE_DIR_V3" | grep -oP '[^/]+$')
+
+          # 解析 x64v2
+          BASE_DIR_V2=$(echo "$LINK_V2" | grep -oP '.+(?=/linux-upstream_)')
+          VERSION_STR_V2=$(echo "$LINK_V2" | grep -oP '(?<=linux-upstream_)[^/]+(?=\.changes)')
+          KERNEL_NAME_V2=$(echo "$BASE_DIR_V2" | grep -oP '[^/]+$')
+
+          echo "V3: $KERNEL_NAME_V3 / $VERSION_STR_V3"
+          echo "V2: $KERNEL_NAME_V2 / $VERSION_STR_V2"
+
+          echo "base_v3=$BASE_DIR_V3" >> $GITHUB_OUTPUT
+          echo "ver_v3=$VERSION_STR_V3" >> $GITHUB_OUTPUT
+          echo "name_v3=$KERNEL_NAME_V3" >> $GITHUB_OUTPUT
+          echo "base_v2=$BASE_DIR_V2" >> $GITHUB_OUTPUT
+          echo "ver_v2=$VERSION_STR_V2" >> $GITHUB_OUTPUT
+          echo "name_v2=$KERNEL_NAME_V2" >> $GITHUB_OUTPUT
+
+      - name: Download x64v3 packages
+        run: |
+          set -e
           mkdir -p kernel/x64v3
-          mkdir -p kernel/x64v2
-
-          # 下载 x64v3
-          echo ""
-          echo "=== Downloading x64v3 packages ==="
           cd kernel/x64v3
-          wget -q --content-disposition "$IMAGE_V3"
-          wget -q --content-disposition "$HEADERS_V3"
-          [ -n "$LIBC_V3" ] && wget -q --content-disposition "$LIBC_V3" || true
-          ls -lh .
-          cd ../..
 
-          # 下载 x64v2
-          echo ""
-          echo "=== Downloading x64v2 packages ==="
-          cd kernel/x64v2
-          wget -q --content-disposition "$IMAGE_V2"
-          wget -q --content-disposition "$HEADERS_V2"
-          [ -n "$LIBC_V2" ] && wget -q --content-disposition "$LIBC_V2" || true
+          BASE="${{ steps.parse_rss.outputs.base_v3 }}"
+          VER="${{ steps.parse_rss.outputs.ver_v3 }}"
+          NAME="${{ steps.parse_rss.outputs.name_v3 }}"
+
+          IMAGE_URL="${BASE}/linux-image-${NAME}_${VER}.deb/download"
+          HEADERS_URL="${BASE}/linux-headers-${NAME}_${VER}.deb/download"
+          LIBC_URL="${BASE}/linux-libc-dev_${VER}.deb/download"
+
+          echo "Downloading:"
+          echo "  $IMAGE_URL"
+          echo "  $HEADERS_URL"
+          echo "  $LIBC_URL"
+
+          # 用 curl -L 跟随重定向，-o 指定固定文件名，避免 ?viasf=1 污染文件名
+          curl -fsSL "$IMAGE_URL"   -o "linux-image-${NAME}_${VER}.deb"
+          curl -fsSL "$HEADERS_URL" -o "linux-headers-${NAME}_${VER}.deb"
+          curl -fsSL "$LIBC_URL"    -o "linux-libc-dev_${VER}.deb"
+
+          echo "=== Downloaded x64v3 files ==="
           ls -lh .
-          cd ../..
+
+      - name: Download x64v2 packages
+        run: |
+          set -e
+          mkdir -p kernel/x64v2
+          cd kernel/x64v2
+
+          BASE="${{ steps.parse_rss.outputs.base_v2 }}"
+          VER="${{ steps.parse_rss.outputs.ver_v2 }}"
+          NAME="${{ steps.parse_rss.outputs.name_v2 }}"
+
+          IMAGE_URL="${BASE}/linux-image-${NAME}_${VER}.deb/download"
+          HEADERS_URL="${BASE}/linux-headers-${NAME}_${VER}.deb/download"
+          LIBC_URL="${BASE}/linux-libc-dev_${VER}.deb/download"
+
+          echo "Downloading:"
+          echo "  $IMAGE_URL"
+          echo "  $HEADERS_URL"
+          echo "  $LIBC_URL"
+
+          curl -fsSL "$IMAGE_URL"   -o "linux-image-${NAME}_${VER}.deb"
+          curl -fsSL "$HEADERS_URL" -o "linux-headers-${NAME}_${VER}.deb"
+          curl -fsSL "$LIBC_URL"    -o "linux-libc-dev_${VER}.deb"
+
+          echo "=== Downloaded x64v2 files ==="
+          ls -lh .
 
       - name: List all downloaded files
         run: |
