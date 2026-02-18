@@ -28,7 +28,7 @@ jobs:
             | xmlstarlet sel -t -v "//item/title" -n \
             | grep -oE '[0-9]+\.[0-9]+\.[0-9]+-rt(-x64v[23])?-xanmod[0-9]+')
 
-          # 去重并取第一个（最新版本）
+          # 去重并取最新
           VERSION=$(echo "$ALL_VERSIONS" | awk '!seen[$0]++' | head -n1)
 
           if [ -z "$VERSION" ]; then
@@ -45,10 +45,9 @@ jobs:
           BASE_DIR="kernel"
           mkdir -p $BASE_DIR/x64v2
           mkdir -p $BASE_DIR/x64v3
-
           BASE_URL="https://sourceforge.net/projects/xanmod/files/releases/rt"
 
-          # 获取目录名（去掉 -x64v3-xanmod1）
+          # 目录名去掉 -x64v3-xanmod1
           DIR_VERSION=${VERSION%-x64v3-xanmod1}
 
           # 下载 x64v2
