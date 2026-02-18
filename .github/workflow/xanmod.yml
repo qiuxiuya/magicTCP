@@ -1,0 +1,145 @@
+name: Download XanMod Kernel Packages
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 1'  # 每周一自动检查更新
+
+jobs:
+  download-kernels:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg lsb-release apt-rdepends
+
+      - name: Add XanMod GPG key
+        run: |
+          wget -qO - https://dl.xanmod.org/archive.key | \
+            gpg --dearmor | \
+            sudo tee /etc/apt/keyrings/xanmod-archive-keyring.gpg > /dev/null
+
+      - name: Add XanMod APT source
+        run: |
+          echo "deb [signed-by=/etc/apt/keyrings/xanmod-archive-keyring.gpg] http://deb.xanmod.org $(lsb_release -sc) main non-free" | \
+            sudo tee /etc/apt/sources.list.d/xanmod-release.list
+
+      - name: Update APT cache
+        run: sudo apt-get update
+
+      - name: Create output directories
+        run: |
+          mkdir -p kernel/x64v3
+          mkdir -p kernel/x64v2
+
+      - name: Get latest rt-x64v3-xanmod1 package name
+        id: pkg_v3
+        run: |
+          PKG=$(apt-cache search 'linux-image.*rt.*xanmod1' | grep 'x64v3' | sort -V | tail -n1 | awk '{print $1}')
+          if [ -z "$PKG" ]; then
+            PKG=$(apt-cache search 'linux.*rt.*x64v3.*xanmod1' | sort -V | tail -n1 | awk '{print $1}')
+          fi
+          echo "pkg=$PKG" >> $GITHUB_OUTPUT
+          echo "Found rt-x64v3 package: $PKG"
+
+      - name: Get latest x64v2-xanmod1 package name
+        id: pkg_v2
+        run: |
+          PKG=$(apt-cache search 'linux-image.*xanmod1' | grep 'x64v2' | grep -v 'rt' | sort -V | tail -n1 | awk '{print $1}')
+          if [ -z "$PKG" ]; then
+            PKG=$(apt-cache search 'linux.*x64v2.*xanmod1' | grep -v 'rt' | sort -V | tail -n1 | awk '{print $1}')
+          fi
+          echo "pkg=$PKG" >> $GITHUB_OUTPUT
+          echo "Found x64v2 package: $PKG"
+
+      - name: Download rt-x64v3-xanmod1 and all dependencies
+        run: |
+          cd kernel/x64v3
+
+          # 获取主包及其所有依赖包列表（递归）
+          PKG="${{ steps.pkg_v3.outputs.pkg }}"
+          echo "Downloading package: $PKG and all dependencies"
+
+          # 使用 apt-get download 下载主包及依赖
+          # 先获取完整依赖列表
+          DEPS=$(apt-rdepends "$PKG" 2>/dev/null | grep -v '^ ' | grep -v '^Reading' | tr '\n' ' ')
+          echo "Dependencies: $DEPS"
+
+          # 下载主包
+          apt-get download "$PKG"
+
+          # 下载所有相关 linux 内核包（headers, image, modules 等同版本）
+          VERSION=$(apt-cache show "$PKG" | grep '^Version:' | awk '{print $2}')
+          echo "Kernel version: $VERSION"
+
+          # 找出同版本的所有相关包并下载
+          apt-cache search "xanmod" | grep "x64v3" | awk '{print $1}' | while read p; do
+            PKG_VER=$(apt-cache show "$p" 2>/dev/null | grep '^Version:' | awk '{print $2}')
+            if [ "$PKG_VER" = "$VERSION" ]; then
+              echo "Downloading related package: $p"
+              apt-get download "$p" || true
+            fi
+          done
+
+          ls -lh .
+
+      - name: Download x64v2-xanmod1 and all dependencies
+        run: |
+          cd kernel/x64v2
+
+          PKG="${{ steps.pkg_v2.outputs.pkg }}"
+          echo "Downloading package: $PKG and all dependencies"
+
+          # 下载主包
+          apt-get download "$PKG"
+
+          # 下载所有同版本相关包
+          VERSION=$(apt-cache show "$PKG" | grep '^Version:' | awk '{print $2}')
+          echo "Kernel version: $VERSION"
+
+          apt-cache search "xanmod" | grep "x64v2" | grep -v "rt" | awk '{print $1}' | while read p; do
+            PKG_VER=$(apt-cache show "$p" 2>/dev/null | grep '^Version:' | awk '{print $2}')
+            if [ "$PKG_VER" = "$VERSION" ]; then
+              echo "Downloading related package: $p"
+              apt-get download "$p" || true
+            fi
+          done
+
+          ls -lh .
+
+      - name: List downloaded files
+        run: |
+          echo "=== kernel/x64v3 ==="
+          ls -lh kernel/x64v3/
+          echo ""
+          echo "=== kernel/x64v2 ==="
+          ls -lh kernel/x64v2/
+
+      - name: Upload x64v3 kernel packages as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xanmod-rt-x64v3-xanmod1
+          path: kernel/x64v3/
+          retention-days: 30
+
+      - name: Upload x64v2 kernel packages as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xanmod-x64v2-xanmod1
+          path: kernel/x64v2/
+          retention-days: 30
+
+      - name: Commit and push downloaded packages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add kernel/
+          git diff --staged --quiet || git commit -m "chore: update XanMod kernel packages $(date +'%Y-%m-%d')"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
