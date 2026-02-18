@@ -14,16 +14,17 @@ jobs:
       - name: Install required tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget gpg lsb-release apt-rdepends
+          sudo apt-get install -y curl gpg lsb-release apt-rdepends
 
       - name: Add XanMod GPG key
         run: |
           sudo mkdir -p /etc/apt/keyrings
-          wget -qO- https://dl.xanmod.org/archive.key | gpg --dearmor | sudo tee /etc/apt/keyrings/xanmod-archive-keyring.gpg > /dev/null
+          curl -fsSL https://dl.xanmod.org/archive.key | sudo gpg --dearmor -o /etc/apt/keyrings/xanmod-archive-keyring.gpg
+          sudo chmod 644 /etc/apt/keyrings/xanmod-archive-keyring.gpg
 
       - name: Add XanMod repository
         run: |
-          echo "deb [signed-by=/etc/apt/keyrings/xanmod-archive-keyring.gpg] http://deb.xanmod.org $(lsb_release -sc) main non-free" | sudo tee /etc/apt/sources.list.d/xanmod-release.list
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/xanmod-archive-keyring.gpg] http://deb.xanmod.org $(lsb_release -sc) main non-free" | sudo tee /etc/apt/sources.list.d/xanmod-release.list
           sudo apt-get update
 
       - name: Create kernel directories
@@ -33,15 +34,17 @@ jobs:
 
       - name: Download latest rt-x64v3-xanmod1 with dependencies
         run: |
-          PACKAGE=$(apt-cache search linux-image | grep rt-x64v3-xanmod1 | awk '{print $1}' | sort -V | tail -n1)
-          apt-rdepends $PACKAGE | grep -v "^ " | grep -v "^libc6" | sort -u > pkglist.txt
+          PACKAGE=$(apt-cache search ^linux-image | grep rt-x64v3-xanmod1 | awk '{print $1}' | sort -V | tail -n1)
+          echo "Latest package: $PACKAGE"
+          apt-rdepends $PACKAGE | grep -v "^ " | sort -u > pkglist.txt
           cd kernel/x64v3
           xargs -a ../../pkglist.txt apt-get download
 
       - name: Download latest x64v2-xanmod1 with dependencies
         run: |
-          PACKAGE=$(apt-cache search linux-image | grep x64v2-xanmod1 | grep -v rt | awk '{print $1}' | sort -V | tail -n1)
-          apt-rdepends $PACKAGE | grep -v "^ " | grep -v "^libc6" | sort -u > pkglist.txt
+          PACKAGE=$(apt-cache search ^linux-image | grep x64v2-xanmod1 | grep -v rt | awk '{print $1}' | sort -V | tail -n1)
+          echo "Latest package: $PACKAGE"
+          apt-rdepends $PACKAGE | grep -v "^ " | sort -u > pkglist.txt
           cd kernel/x64v2
           xargs -a ../../pkglist.txt apt-get download
 
