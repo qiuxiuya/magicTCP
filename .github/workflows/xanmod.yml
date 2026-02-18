@@ -20,9 +20,12 @@ jobs:
 
       - name: Add XanMod GPG key
         run: |
-          wget -qO - https://dl.xanmod.org/archive.key | \
-            gpg --dearmor | \
+          sudo mkdir -p /etc/apt/keyrings
+          wget -qO /tmp/xanmod-archive.key https://dl.xanmod.org/archive.key
+          # archive.key 是 ASCII armored 格式，需要先 dearmor 再写入 keyring
+          gpg --dearmor < /tmp/xanmod-archive.key | \
             sudo tee /etc/apt/keyrings/xanmod-archive-keyring.gpg > /dev/null
+          sudo chmod 644 /etc/apt/keyrings/xanmod-archive-keyring.gpg
 
       - name: Add XanMod APT source
         run: |
@@ -61,23 +64,16 @@ jobs:
         run: |
           cd kernel/x64v3
 
-          # 获取主包及其所有依赖包列表（递归）
           PKG="${{ steps.pkg_v3.outputs.pkg }}"
           echo "Downloading package: $PKG and all dependencies"
-
-          # 使用 apt-get download 下载主包及依赖
-          # 先获取完整依赖列表
-          DEPS=$(apt-rdepends "$PKG" 2>/dev/null | grep -v '^ ' | grep -v '^Reading' | tr '\n' ' ')
-          echo "Dependencies: $DEPS"
 
           # 下载主包
           apt-get download "$PKG"
 
-          # 下载所有相关 linux 内核包（headers, image, modules 等同版本）
+          # 下载所有同版本相关包（headers, modules 等）
           VERSION=$(apt-cache show "$PKG" | grep '^Version:' | awk '{print $2}')
           echo "Kernel version: $VERSION"
 
-          # 找出同版本的所有相关包并下载
           apt-cache search "xanmod" | grep "x64v3" | awk '{print $1}' | while read p; do
             PKG_VER=$(apt-cache show "$p" 2>/dev/null | grep '^Version:' | awk '{print $2}')
             if [ "$PKG_VER" = "$VERSION" ]; then
