@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install dependencies
@@ -22,9 +22,17 @@ jobs:
         id: getver
         run: |
           RSS_URL="https://sourceforge.net/p/xanmod/activity/feed.rss"
-          VERSION=$(curl -s "$RSS_URL" \
-            | xmlstarlet sel -t -v "//item/title[contains(.,'rt')][1]" \
-            | grep -oP '\d+\.\d+\.\d+-rt\d+')
+
+          # 取最新 item title
+          LATEST_TITLE=$(curl -s "$RSS_URL" | xmlstarlet sel -t -v "//item/title[1]")
+
+          # 提取 RT 核心版本，如 6.18.10-rt-x64v3-xanmod1
+          VERSION=$(echo "$LATEST_TITLE" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+-rt(-x64v[23])?-xanmod[0-9]+')
+
+          if [ -z "$VERSION" ]; then
+            echo "Failed to parse latest RT version from RSS"
+            exit 1
+          fi
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Latest RT version: $VERSION"
@@ -32,19 +40,24 @@ jobs:
       - name: Download latest deb packages
         run: |
           VERSION=${{ steps.getver.outputs.version }}
+          BASE_DIR="kernel"
+          mkdir -p $BASE_DIR/x64v2
+          mkdir -p $BASE_DIR/x64v3
 
-          mkdir -p kernel/x64v2
-          mkdir -p kernel/x64v3
+          BASE_URL="https://sourceforge.net/projects/xanmod/files/releases/rt"
 
-          BASE_URL="https://sourceforge.net/projects/xanmod/files/releases"
+          # 获取目录名（去掉 -x64v3-xanmod1）
+          DIR_VERSION=${VERSION%-x64v3-xanmod1}
 
-          curl -L -o kernel/x64v2/linux-image.deb \
-            "$BASE_URL/${VERSION}/linux-image-${VERSION}-x64v2.deb/download"
+          # 下载 x64v2
+          curl -L -o $BASE_DIR/x64v2/linux-image.deb \
+            "$BASE_URL/$DIR_VERSION/$DIR_VERSION-x64v2-xanmod1/linux-image-$DIR_VERSION-x64v2-xanmod1.deb/download"
 
-          curl -L -o kernel/x64v3/linux-image.deb \
-            "$BASE_URL/${VERSION}/linux-image-${VERSION}-x64v3.deb/download"
+          # 下载 x64v3
+          curl -L -o $BASE_DIR/x64v3/linux-image.deb \
+            "$BASE_URL/$DIR_VERSION/$VERSION/linux-image-$VERSION.deb/download"
 
-      - name: Commit and push
+      - name: Commit and push changes
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
@@ -52,7 +65,7 @@ jobs:
           git add kernel/x64v2/linux-image.deb kernel/x64v3/linux-image.deb
 
           if git diff --cached --quiet; then
-            echo "No changes"
+            echo "No changes detected"
           else
             git commit -m "Update latest XanMod RT kernel"
             git push
