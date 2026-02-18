@@ -23,12 +23,10 @@ jobs:
         run: |
           RSS_URL="https://sourceforge.net/p/xanmod/activity/feed.rss"
 
-          # 取所有包含 rt 的版本字符串
           ALL_VERSIONS=$(curl -s "$RSS_URL" \
             | xmlstarlet sel -t -v "//item/title" -n \
             | grep -oE '[0-9]+\.[0-9]+\.[0-9]+-rt(-x64v[23])?-xanmod[0-9]+')
 
-          # 去重并取最新
           VERSION=$(echo "$ALL_VERSIONS" | awk '!seen[$0]++' | head -n1)
 
           if [ -z "$VERSION" ]; then
@@ -47,14 +45,11 @@ jobs:
           mkdir -p $BASE_DIR/x64v3
           BASE_URL="https://sourceforge.net/projects/xanmod/files/releases/rt"
 
-          # 目录名去掉 -x64v3-xanmod1
           DIR_VERSION=${VERSION%-x64v3-xanmod1}
 
-          # 下载 x64v2
           curl -L -o $BASE_DIR/x64v2/linux-image.deb \
             "$BASE_URL/$DIR_VERSION/$DIR_VERSION-x64v2-xanmod1/linux-image-$DIR_VERSION-x64v2-xanmod1.deb/download"
 
-          # 下载 x64v3
           curl -L -o $BASE_DIR/x64v3/linux-image.deb \
             "$BASE_URL/$DIR_VERSION/$VERSION/linux-image-$VERSION.deb/download"
 
@@ -70,3 +65,4 @@ jobs:
           else
             git commit -m "Update latest XanMod RT kernel"
             git push
+          fi
