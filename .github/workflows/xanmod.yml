@@ -23,11 +23,13 @@ jobs:
         run: |
           RSS_URL="https://sourceforge.net/p/xanmod/activity/feed.rss"
 
-          # 取最新 item title
-          LATEST_TITLE=$(curl -s "$RSS_URL" | xmlstarlet sel -t -v "//item/title[1]")
+          # 取所有包含 rt 的版本字符串
+          ALL_VERSIONS=$(curl -s "$RSS_URL" \
+            | xmlstarlet sel -t -v "//item/title" -n \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+-rt(-x64v[23])?-xanmod[0-9]+')
 
-          # 提取 RT 核心版本，如 6.18.10-rt-x64v3-xanmod1
-          VERSION=$(echo "$LATEST_TITLE" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+-rt(-x64v[23])?-xanmod[0-9]+')
+          # 去重并取第一个（最新版本）
+          VERSION=$(echo "$ALL_VERSIONS" | awk '!seen[$0]++' | head -n1)
 
           if [ -z "$VERSION" ]; then
             echo "Failed to parse latest RT version from RSS"
