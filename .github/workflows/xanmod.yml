@@ -1,68 +1,155 @@
-name: Sync Latest XanMod RT Kernel
+name: Fetch XanMod RT Kernel
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: '0 */6 * * *'   # 每6小时检查一次
+  workflow_dispatch:          # 允许手动触发
+
+permissions:
+  contents: write
 
 jobs:
-  sync-latest:
+  fetch-kernel:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl xmlstarlet
-
-      - name: Get latest RT version from RSS
-        id: getver
+      - name: Parse RSS feed and get latest RT version
+        id: get_version
         run: |
           RSS_URL="https://sourceforge.net/p/xanmod/activity/feed.rss"
+          echo "Fetching RSS feed: $RSS_URL"
 
-          ALL_VERSIONS=$(curl -s "$RSS_URL" \
-            | xmlstarlet sel -t -v "//item/title" -n \
-            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+-rt(-x64v[23])?-xanmod[0-9]+')
+          # 下载 RSS
+          curl -fsSL "$RSS_URL" -o feed.rss
 
-          VERSION=$(echo "$ALL_VERSIONS" | awk '!seen[$0]++' | head -n1)
+          # 从 RSS title/link 中提取最新的 RT 版本号
+          # RSS 条目格式示例: releases/rt/6.12.28-rt-xanmod1/...
+          LATEST_VERSION=$(grep -oP 'releases/rt/\K[^/>"]+' feed.rss \
+            | grep -v '^\.' \
+            | head -1)
 
-          if [ -z "$VERSION" ]; then
-            echo "Failed to parse latest RT version from RSS"
+          if [ -z "$LATEST_VERSION" ]; then
+            echo "❌ Failed to parse RT version from RSS"
+            cat feed.rss | head -50
             exit 1
           fi
 
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Latest RT version: $VERSION"
+          echo "Latest RT version: $LATEST_VERSION"
+          echo "version=$LATEST_VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Download latest deb packages
+      - name: Check if version already downloaded
+        id: check_cache
         run: |
-          VERSION=${{ steps.getver.outputs.version }}
-          BASE_DIR="kernel"
-          mkdir -p $BASE_DIR/x64v2
-          mkdir -p $BASE_DIR/x64v3
-          BASE_URL="https://sourceforge.net/projects/xanmod/files/releases/rt"
+          VERSION="${{ steps.get_version.outputs.version }}"
+          MARKER="kernel/.version"
 
-          DIR_VERSION=${VERSION%-x64v3-xanmod1}
+          if [ -f "$MARKER" ] && [ "$(cat $MARKER)" = "$VERSION" ]; then
+            echo "Version $VERSION already up to date, skipping download."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "New version detected: $VERSION"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
 
-          curl -L -o $BASE_DIR/x64v2/linux-image.deb \
-            "$BASE_URL/$DIR_VERSION/$DIR_VERSION-x64v2-xanmod1/linux-image-$DIR_VERSION-x64v2-xanmod1.deb/download"
-
-          curl -L -o $BASE_DIR/x64v3/linux-image.deb \
-            "$BASE_URL/$DIR_VERSION/$VERSION/linux-image-$VERSION.deb/download"
-
-      - name: Commit and push changes
+      - name: Download RT kernel debs for x64v2 and x64v3
+        if: steps.check_cache.outputs.skip == 'false'
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
+          VERSION="${{ steps.get_version.outputs.version }}"
+          SF_BASE="https://sourceforge.net/projects/xanmod/files/releases/rt/${VERSION}"
 
-          git add kernel/x64v2/linux-image.deb kernel/x64v3/linux-image.deb
+          mkdir -p kernel/x64v2 kernel/x64v3
+
+          download_deb() {
+            local ARCH="$1"     # x64v2 or x64v3
+            local TYPE="$2"     # linux-image or linux-headers
+            local DIR="kernel/${ARCH}"
+
+            # 获取该目录的文件列表页面，解析出实际文件名
+            local LIST_URL="${SF_BASE}/${ARCH}/"
+            echo "→ Fetching file list: $LIST_URL"
+
+            local HTML
+            HTML=$(curl -fsSL "$LIST_URL") || {
+              echo "⚠️  Could not fetch listing for ${ARCH}/${TYPE}, skipping."
+              return 0
+            }
+
+            # 解析出匹配的 .deb 文件名
+            local FILENAME
+            FILENAME=$(echo "$HTML" \
+              | grep -oP "(?<=\"/projects/xanmod/files/releases/rt/${VERSION}/${ARCH}/)[^\"]+\.deb(?=/download)" \
+              | grep "^${TYPE}-" \
+              | head -1)
+
+            if [ -z "$FILENAME" ]; then
+              echo "⚠️  No ${TYPE} .deb found for ${ARCH}"
+              return 0
+            fi
+
+            local DL_URL="https://sourceforge.net/projects/xanmod/files/releases/rt/${VERSION}/${ARCH}/${FILENAME}/download"
+            local OUT="${DIR}/${FILENAME}"
+
+            if [ -f "$OUT" ]; then
+              echo "  Already exists: $OUT"
+              return 0
+            fi
+
+            echo "  Downloading: $FILENAME"
+            curl -fL --retry 3 --retry-delay 5 -o "$OUT" "$DL_URL"
+            echo "  ✅ Saved: $OUT"
+          }
+
+          for ARCH in x64v2 x64v3; do
+            echo "=== Processing ${ARCH} ==="
+            download_deb "$ARCH" "linux-image"
+            download_deb "$ARCH" "linux-headers"
+          done
+
+      - name: Clean old kernel files (keep only latest)
+        if: steps.check_cache.outputs.skip == 'false'
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+
+          for ARCH in x64v2 x64v3; do
+            DIR="kernel/${ARCH}"
+            # 删除不属于当前版本的 .deb 文件
+            find "$DIR" -name "*.deb" | while read -r f; do
+              if ! echo "$f" | grep -q "$VERSION"; then
+                echo "Removing old file: $f"
+                rm -f "$f"
+              fi
+            done
+          done
+
+      - name: Update version marker
+        if: steps.check_cache.outputs.skip == 'false'
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          echo "$VERSION" > kernel/.version
+          echo "Version marker updated to: $VERSION"
+
+      - name: List downloaded files
+        run: |
+          echo "=== kernel/ directory ==="
+          find kernel/ -type f | sort
+
+      - name: Commit and push
+        if: steps.check_cache.outputs.skip == 'false'
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add kernel/
 
           if git diff --cached --quiet; then
-            echo "No changes detected"
+            echo "Nothing to commit."
           else
-            git commit -m "Update latest XanMod RT kernel"
+            git commit -m "chore: update XanMod RT kernel to ${VERSION}"
             git push
+            echo "✅ Pushed version ${VERSION}"
           fi
