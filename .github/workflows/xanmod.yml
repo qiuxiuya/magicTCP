@@ -22,9 +22,13 @@ jobs:
         run: |
           sudo mkdir -p /etc/apt/keyrings
           wget -qO /tmp/xanmod-archive.key https://dl.xanmod.org/archive.key
-          # archive.key 是 ASCII armored 格式，需要先 dearmor 再写入 keyring
-          gpg --dearmor < /tmp/xanmod-archive.key | \
-            sudo tee /etc/apt/keyrings/xanmod-archive-keyring.gpg > /dev/null
+          # 检测文件格式：如果是 ASCII armored 则 dearmor，否则直接复制
+          if file /tmp/xanmod-archive.key | grep -q "PGP public key block Secret-Key\|ASCII\|text"; then
+            gpg --dearmor < /tmp/xanmod-archive.key | \
+              sudo tee /etc/apt/keyrings/xanmod-archive-keyring.gpg > /dev/null
+          else
+            sudo cp /tmp/xanmod-archive.key /etc/apt/keyrings/xanmod-archive-keyring.gpg
+          fi
           sudo chmod 644 /etc/apt/keyrings/xanmod-archive-keyring.gpg
 
       - name: Add XanMod APT source
