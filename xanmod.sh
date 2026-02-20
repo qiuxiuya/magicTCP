@@ -1,5 +1,5 @@
 install_xanmod_kernel() {
-    apt install -y wget
+    apt update -y && apt install -y wget curl
     LEVEL=$(awk '
 BEGIN {
     while (!/flags/) if (getline < "/proc/cpuinfo" != 1) exit 1
@@ -12,33 +12,34 @@ BEGIN {
 }
 ')
 
-WORKDIR=$(mktemp -d)
-cd "$WORKDIR"
+    WORKDIR=$(mktemp -d)
+    cd "$WORKDIR"
 
-if [ "$LEVEL" = "2" ]; then
-    URLS=(
-        "https://raw.githubusercontent.com/qiuxiuya/magicTCP/refs/heads/main/kernel/xanmod-x86v2/linux-headers-6.12.62-rt-x64v2-xanmod1_6.12.62-rt-x64v2-xanmod1-0~20251213.g168fc65_amd64.deb"
-        "https://raw.githubusercontent.com/qiuxiuya/magicTCP/refs/heads/main/kernel/xanmod-x86v2/linux-image-6.12.62-rt-x64v2-xanmod1_6.12.62-rt-x64v2-xanmod1-0~20251213.g168fc65_amd64.deb"
-        "https://raw.githubusercontent.com/qiuxiuya/magicTCP/refs/heads/main/kernel/xanmod-x86v2/linux-xanmod-rt-x64v2_6.12.62-rt-xanmod1-0_amd64.deb"
-    )
-elif [ "$LEVEL" = "3" ] || [ "$LEVEL" = "4" ]; then
-    URLS=(
-        "https://raw.githubusercontent.com/qiuxiuya/magicTCP/refs/heads/main/kernel/xanmod-x86v3/linux-headers-6.12.62-rt-x64v3-xanmod1_6.12.62-rt-x64v3-xanmod1-0~20251213.g168fc65_amd64.deb"
-        "https://raw.githubusercontent.com/qiuxiuya/magicTCP/refs/heads/main/kernel/xanmod-x86v3/linux-image-6.12.62-rt-x64v3-xanmod1_6.12.62-rt-x64v3-xanmod1-0~20251213.g168fc65_amd64.deb"
-        "https://raw.githubusercontent.com/qiuxiuya/magicTCP/refs/heads/main/kernel/xanmod-x86v3/linux-xanmod-rt-x64v3_6.12.62-rt-xanmod1-0_amd64.deb"
-    )
-else
-    echo "CPU x86-64-v$LEVEL not support"
-    exit 1
-fi
+    if [ "$LEVEL" = "2" ]; then
+        KERNEL_PATH="kernel/x64v2"
+    elif [ "$LEVEL" = "3" ] || [ "$LEVEL" = "4" ]; then
+        KERNEL_PATH="kernel/x64v3"
+    else
+        echo "CPU x86-64-v$LEVEL not support"
+        exit 1
+    fi
 
-for u in "${URLS[@]}"; do
-    wget "$u"
-done
+    API_URL="https://api.github.com/repos/qiuxiuya/magicTCP/contents/$KERNEL_PATH"
+    
+    DOWNLOAD_URLS=$(curl -s "$API_URL" | grep "download_url" | grep ".deb" | cut -d '"' -f 4)
+    
+    if [ -z "$DOWNLOAD_URLS" ]; then
+        echo "Failed to fetch kernel files."
+        exit 1
+    fi
 
-dpkg -i ./*.deb
-cd /
-rm -rf "$WORKDIR"
+    for u in $DOWNLOAD_URLS; do
+        wget -q "$u"
+    done
+
+    dpkg -i ./*.deb
+    cd /
+    rm -rf "$WORKDIR"
 
 for kver in $(ls /lib/modules | grep xanmod); do
     update-initramfs -c -k "$kver"
