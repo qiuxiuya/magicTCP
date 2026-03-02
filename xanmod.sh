@@ -53,7 +53,6 @@ apply_tcp_optimization() {
     declare -A params=(
         ["net.ipv4.tcp_congestion_control"]="bbr"
         ["net.core.default_qdisc"]="fq"
-        ["net.ipv4.tcp_fastopen"]="3"
     )
 
     cp /etc/sysctl.conf /etc/sysctl.conf.bak
