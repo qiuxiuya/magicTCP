@@ -1,4 +1,4 @@
-name: Download XanMod RT Kernel Packages
+name: Download XanMod LTS Kernel Packages
 
 on:
   workflow_dispatch:
@@ -22,11 +22,11 @@ jobs:
           RSS=$(curl -fsSL "https://sourceforge.net/p/xanmod/activity/feed")
 
           # 提取 .changes/download 链接
-          LINKS=$(echo "$RSS" | grep -oP 'https://sourceforge\.net/projects/xanmod/files/releases/rt/[^"<>\s]+\.changes/download' | sort -u)
+          LINKS=$(echo "$RSS" | grep -oP 'https://sourceforge\.net/projects/xanmod/files/releases/lts/[^"<>\s]+\.changes/download' | sort -u)
 
           if [ -z "$LINKS" ]; then
             # 尝试从 <link> 标签中提取
-            LINKS=$(echo "$RSS" | grep -oP '(?<=<link>)[^<]+releases/rt/[^<]+\.changes/download(?=</link>)' | sort -u)
+            LINKS=$(echo "$RSS" | grep -oP '(?<=<link>)[^<]+releases/lts/[^<]+\.changes/download(?=</link>)' | sort -u)
           fi
 
           if [ -z "$LINKS" ]; then
