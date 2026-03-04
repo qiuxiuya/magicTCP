@@ -21,32 +21,46 @@ jobs:
           echo "Fetching RSS feed..."
           RSS=$(curl -fsSL "https://sourceforge.net/p/xanmod/activity/feed")
 
+          # 提取 .changes/download 链接
           LINKS=$(echo "$RSS" | grep -oP 'https://sourceforge\.net/projects/xanmod/files/releases/lts/[^"<>\s]+\.changes/download' | sort -u)
 
           if [ -z "$LINKS" ]; then
+            # 尝试从 <link> 标签中提取
             LINKS=$(echo "$RSS" | grep -oP '(?<=<link>)[^<]+releases/lts/[^<]+\.changes/download(?=</link>)' | sort -u)
           fi
 
           if [ -z "$LINKS" ]; then
             echo "ERROR: No .changes/download links found"
+            echo "$RSS"
             exit 1
           fi
 
+          echo "=== Found .changes links ==="
+          echo "$LINKS"
+
           LINK_V3=$(echo "$LINKS" | grep 'x64v3' | sort -V | tail -n1)
           LINK_V2=$(echo "$LINKS" | grep 'x64v2' | sort -V | tail -n1)
+
+          echo "Latest x64v3: $LINK_V3"
+          echo "Latest x64v2: $LINK_V2"
 
           if [ -z "$LINK_V3" ] || [ -z "$LINK_V2" ]; then
             echo "ERROR: Could not find x64v3 or x64v2 links"
             exit 1
           fi
 
+          # 解析 x64v3
           BASE_DIR_V3=$(echo "$LINK_V3" | grep -oP '.+(?=/linux-upstream_)')
           VERSION_STR_V3=$(echo "$LINK_V3" | grep -oP '(?<=linux-upstream_)[^/]+(?=\.changes)')
           KERNEL_NAME_V3=$(echo "$BASE_DIR_V3" | grep -oP '[^/]+$')
 
+          # 解析 x64v2
           BASE_DIR_V2=$(echo "$LINK_V2" | grep -oP '.+(?=/linux-upstream_)')
           VERSION_STR_V2=$(echo "$LINK_V2" | grep -oP '(?<=linux-upstream_)[^/]+(?=\.changes)')
           KERNEL_NAME_V2=$(echo "$BASE_DIR_V2" | grep -oP '[^/]+$')
+
+          echo "V3: $KERNEL_NAME_V3 / $VERSION_STR_V3"
+          echo "V2: $KERNEL_NAME_V2 / $VERSION_STR_V2"
 
           echo "base_v3=$BASE_DIR_V3" >> $GITHUB_OUTPUT
           echo "ver_v3=$VERSION_STR_V3" >> $GITHUB_OUTPUT
@@ -65,9 +79,22 @@ jobs:
           VER="${{ steps.parse_rss.outputs.ver_v3 }}"
           NAME="${{ steps.parse_rss.outputs.name_v3 }}"
 
-          curl -fsSL "${BASE}/linux-image-${NAME}_${VER}.deb/download"   -o "linux-image-${NAME}_${VER}.deb"
-          curl -fsSL "${BASE}/linux-headers-${NAME}_${VER}.deb/download" -o "linux-headers-${NAME}_${VER}.deb"
-          curl -fsSL "${BASE}/linux-libc-dev_${VER}.deb/download"        -o "linux-libc-dev_${VER}.deb"
+          IMAGE_URL="${BASE}/linux-image-${NAME}_${VER}.deb/download"
+          HEADERS_URL="${BASE}/linux-headers-${NAME}_${VER}.deb/download"
+          LIBC_URL="${BASE}/linux-libc-dev_${VER}.deb/download"
+
+          echo "Downloading:"
+          echo "  $IMAGE_URL"
+          echo "  $HEADERS_URL"
+          echo "  $LIBC_URL"
+
+          # 用 curl -L 跟随重定向，-o 指定固定文件名，避免 ?viasf=1 污染文件名
+          curl -fsSL "$IMAGE_URL"   -o "linux-image-${NAME}_${VER}.deb"
+          curl -fsSL "$HEADERS_URL" -o "linux-headers-${NAME}_${VER}.deb"
+          curl -fsSL "$LIBC_URL"    -o "linux-libc-dev_${VER}.deb"
+
+          echo "=== Downloaded x64v3 files ==="
+          ls -lh .
 
       - name: Download x64v2 packages
         run: |
@@ -79,21 +106,41 @@ jobs:
           VER="${{ steps.parse_rss.outputs.ver_v2 }}"
           NAME="${{ steps.parse_rss.outputs.name_v2 }}"
 
-          curl -fsSL "${BASE}/linux-image-${NAME}_${VER}.deb/download"   -o "linux-image-${NAME}_${VER}.deb"
-          curl -fsSL "${BASE}/linux-headers-${NAME}_${VER}.deb/download" -o "linux-headers-${NAME}_${VER}.deb"
-          curl -fsSL "${BASE}/linux-libc-dev_${VER}.deb/download"        -o "linux-libc-dev_${VER}.deb"
+          IMAGE_URL="${BASE}/linux-image-${NAME}_${VER}.deb/download"
+          HEADERS_URL="${BASE}/linux-headers-${NAME}_${VER}.deb/download"
+          LIBC_URL="${BASE}/linux-libc-dev_${VER}.deb/download"
 
-      - name: Upload x64v3 kernel packages
+          echo "Downloading:"
+          echo "  $IMAGE_URL"
+          echo "  $HEADERS_URL"
+          echo "  $LIBC_URL"
+
+          curl -fsSL "$IMAGE_URL"   -o "linux-image-${NAME}_${VER}.deb"
+          curl -fsSL "$HEADERS_URL" -o "linux-headers-${NAME}_${VER}.deb"
+          curl -fsSL "$LIBC_URL"    -o "linux-libc-dev_${VER}.deb"
+
+          echo "=== Downloaded x64v2 files ==="
+          ls -lh .
+
+      - name: List all downloaded files
+        run: |
+          echo "=== kernel/x64v3 ==="
+          ls -lh kernel/x64v3/
+          echo ""
+          echo "=== kernel/x64v2 ==="
+          ls -lh kernel/x64v2/
+
+      - name: Upload x64v3 kernel packages as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: xanmod-lts-x64v3
+          name: xanmod-LST-x64v3-xanmod1
           path: kernel/x64v3/
           retention-days: 30
 
-      - name: Upload x64v2 kernel packages
+      - name: Upload x64v2 kernel packages as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: xanmod-lts-x64v2
+          name: xanmod-LST-x64v2-xanmod1
           path: kernel/x64v2/
           retention-days: 30
 
@@ -102,7 +149,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add kernel/
-          git diff --staged --quiet || git commit -m "chore: update XanMod LTS kernel packages $(date +'%Y-%m-%d')"
+          git diff --staged --quiet || git commit -m "chore: update XanMod LST kernel packages $(date +'%Y-%m-%d')"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
