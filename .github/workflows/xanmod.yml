@@ -72,6 +72,8 @@ jobs:
       - name: Download x64v3 packages
         run: |
           set -e
+          # 清空旧版本，只保留最新
+          rm -rf kernel/x64v3
           mkdir -p kernel/x64v3
           cd kernel/x64v3
 
@@ -88,7 +90,6 @@ jobs:
           echo "  $HEADERS_URL"
           echo "  $LIBC_URL"
 
-          # 用 curl -L 跟随重定向，-o 指定固定文件名，避免 ?viasf=1 污染文件名
           curl -fsSL "$IMAGE_URL"   -o "linux-image-${NAME}_${VER}.deb"
           curl -fsSL "$HEADERS_URL" -o "linux-headers-${NAME}_${VER}.deb"
           curl -fsSL "$LIBC_URL"    -o "linux-libc-dev_${VER}.deb"
@@ -99,6 +100,8 @@ jobs:
       - name: Download x64v2 packages
         run: |
           set -e
+          # 清空旧版本，只保留最新
+          rm -rf kernel/x64v2
           mkdir -p kernel/x64v2
           cd kernel/x64v2
 
