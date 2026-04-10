@@ -1,0 +1,62 @@
+name: Download XanMod Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  download-kernels:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download x64v3 packages
+        run: |
+          set -e
+          mkdir -p kernel/6.18.2-x64v3-xanmod
+          cd kernel/6.18.2-x64v3-xanmod
+
+          BASE="https://sourceforge.net/projects/xanmod/files/releases/main/6.18.2-xanmod1/6.18.2-x64v3-xanmod1"
+
+          curl -fsSL "${BASE}/linux-image-6.18.2-x64v3-xanmod1.deb/download" -o linux-image.deb
+          curl -fsSL "${BASE}/linux-headers-6.18.2-x64v3-xanmod1.deb/download" -o linux-headers.deb
+          curl -fsSL "${BASE}/linux-libc-dev_6.18.2-xanmod1.deb/download" -o linux-libc-dev.deb
+
+          ls -lh
+
+      - name: Download x64v2 packages
+        run: |
+          set -e
+          mkdir -p kernel/6.18.2-x64v2-xanmod
+          cd kernel/6.18.2-x64v2-xanmod
+
+          BASE="https://sourceforge.net/projects/xanmod/files/releases/main/6.18.2-xanmod1/6.18.2-x64v2-xanmod1"
+
+          curl -fsSL "${BASE}/linux-image-6.18.2-x64v2-xanmod1.deb/download" -o linux-image.deb
+          curl -fsSL "${BASE}/linux-headers-6.18.2-x64v2-xanmod1.deb/download" -o linux-headers.deb
+          curl -fsSL "${BASE}/linux-libc-dev_6.18.2-xanmod1.deb/download" -o linux-libc-dev.deb
+
+          ls -lh
+
+      - name: Upload artifacts x64v3
+        uses: actions/upload-artifact@v4
+        with:
+          name: xanmod-6.18.2-x64v3
+          path: kernel/6.18.2-x64v3-xanmod/
+          retention-days: 30
+
+      - name: Upload artifacts x64v2
+        uses: actions/upload-artifact@v4
+        with:
+          name: xanmod-6.18.2-x64v2
+          path: kernel/6.18.2-x64v2-xanmod/
+          retention-days: 30
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add kernel/
+          git diff --staged --quiet || git commit -m "chore: add XanMod 6.18.2 packages"
+          git push
