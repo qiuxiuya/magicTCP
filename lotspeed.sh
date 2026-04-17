@@ -94,17 +94,46 @@ apply_tcp_optimization() {
 }
 
 uninstall_other_kernels() {
+    LEVEL=$(awk '
+BEGIN {
+    while (!/flags/) if (getline < "/proc/cpuinfo" != 1) exit 1
+    if (/lm/&&/cmov/&&/cx8/&&/fpu/&&/fxsr/&&/mmx/&&/syscall/&&/sse2/) level = 1
+    if (level == 1 && /cx16/&&/lahf/&&/popcnt/&&/sse4_1/&&/sse4_2/&&/ssse3/) level = 2
+    if (level == 2 && /avx/&&/avx2/&&/bmi1/&&/bmi2/&&/f16c/&&/fma/&&/abm/&&/movbe/&&/xsave/) level = 3
+    if (level == 3 && /avx512f/&&/avx512bw/&&/avx512cd/&&/avx512dq/&&/avx512vl/) level = 4
+    if (level > 0) { print level; exit 0 }
+    exit 1
+}
+')
+
     if [ "$LEVEL" = "2" ]; then
         INSTALLED_KVER="6.18.2-x64v2-xanmod1"
     elif [ "$LEVEL" = "3" ] || [ "$LEVEL" = "4" ]; then
         INSTALLED_KVER="6.18.2-x64v3-xanmod1"
+    else
+        echo "Unable to detect CPU level, aborting uninstall."
+        exit 1
     fi
 
-    dpkg --list | grep 'linux-image\|linux-headers' | grep -v "$INSTALLED_KVER" | awk '{print $2}' | xargs apt-get remove --purge -y
+    echo "Keeping kernel: $INSTALLED_KVER"
+    echo "Removing all other kernels..."
+
+    dpkg --list | grep linux-image \
+        | grep -v "$INSTALLED_KVER" \
+        | awk '{print $2}' \
+        | xargs --no-run-if-empty apt-get remove --purge -y
+
+    dpkg --list | grep linux-headers \
+        | grep -v "$INSTALLED_KVER" \
+        | awk '{print $2}' \
+        | xargs --no-run-if-empty apt-get remove --purge -y
 
     update-grub
+
     bash <(curl -fsSL https://raw.githubusercontent.com/qiuxiuya/lotspeed/zeta-tcp/install.sh) -u
     apt-get autoclean -y
+
+    echo "Done. Only $INSTALLED_KVER is retained."
 }
 
 echo "1. Install xanmod kernel"
