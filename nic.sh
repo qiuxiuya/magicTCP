@@ -82,8 +82,8 @@ apply_tcp_optimization() {
 * soft nproc 65535
 * hard nproc 65535
 EOF
-
-    ulimit -n 1048576 2>/dev/null || true
+    ulimit -n "$(ulimit -Hn 2>/dev/null)" 2>/dev/null || true
+    ulimit -u "$(ulimit -Hu 2>/dev/null)" 2>/dev/null || true
 
     declare -A params=(
         ["net.core.default_qdisc"]="fq"
@@ -118,8 +118,6 @@ EOF
         ["net.ipv4.conf.default.forwarding"]="1"
         ["net.core.optmem_max"]="65535"
         ["net.ipv4.udp_mem"]="8192 262144 536870912"
-        ["net.ipv6.conf.all.forwarding"]="1"
-        ["net.ipv6.conf.default.forwarding"]="1"
     )
 
     cp /etc/sysctl.conf /etc/sysctl.conf.bak
