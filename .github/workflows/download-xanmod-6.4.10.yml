@@ -1,0 +1,142 @@
+name: Download XanMod 6.4.10 Packages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  download-and-commit:
+    name: Download and commit XanMod 6.4.10 packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      RELEASE_SERIES: 6.4.10-xanmod1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create downloader script
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > download_xanmod_from_rss.py <<'PY'
+          import os
+          import posixpath
+          import subprocess
+          import urllib.request
+          import xml.etree.ElementTree as ET
+
+          rss_url = os.environ["RSS_URL"]
+          target_dir = os.environ["TARGET_DIR"]
+          variant = os.environ["VARIANT"]
+          version_dir = os.environ["VERSION_DIR"]
+          release_series = os.environ["RELEASE_SERIES"]
+
+          with urllib.request.urlopen(rss_url, timeout=60) as response:
+              xml_data = response.read()
+
+          root = ET.fromstring(xml_data)
+          items = root.findall("./channel/item")
+          if not items:
+              raise SystemExit(f"No RSS items found for {variant}: {rss_url}")
+
+          seen = set()
+          downloads = []
+          for item in items:
+              title = (item.findtext("title") or "").strip()
+              description = (item.findtext("description") or "").strip()
+              link = (item.findtext("link") or "").strip()
+              source_path = title or description
+              filename = posixpath.basename(source_path)
+
+              if not link or not filename:
+                  continue
+              if filename in seen:
+                  continue
+              if not filename.endswith(".deb"):
+                  continue
+              if not (
+                  filename.startswith("linux-headers-")
+                  or filename.startswith("linux-libc-dev_")
+                  or filename.startswith("linux-image-")
+              ):
+                  continue
+              if "-dbg_" in filename:
+                  continue
+              if f"/{release_series}/" not in source_path:
+                  continue
+              if f"/{version_dir}/" not in source_path:
+                  continue
+
+              seen.add(filename)
+              downloads.append((filename, link))
+
+          if not downloads:
+              raise SystemExit(f"No downloadable files found for {variant}: {rss_url}")
+
+          os.makedirs(target_dir, exist_ok=True)
+          for filename, link in downloads:
+              destination = os.path.join(target_dir, filename)
+              print(f"Downloading {filename} -> {destination}", flush=True)
+              subprocess.run(
+                  [
+                      "curl",
+                      "--fail",
+                      "--location",
+                      "--retry",
+                      "5",
+                      "--retry-delay",
+                      "3",
+                      "--output",
+                      destination,
+                      link,
+                  ],
+                  check=True,
+              )
+
+          print(f"Downloaded {len(downloads)} files into {target_dir}", flush=True)
+          PY
+
+      - name: Download files from SourceForge RSS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for version in 1 2 3 4; do
+            export VARIANT="v${version}"
+            export VERSION_DIR="6.4.10-x64v${version}-xanmod1"
+            export TARGET_DIR="xanmod/6.4.10/${VERSION_DIR}"
+            export RSS_URL="https://sourceforge.net/projects/xanmod/rss?path=/releases/main/${RELEASE_SERIES}/${VERSION_DIR}"
+
+            mkdir -p "${TARGET_DIR}"
+            python3 download_xanmod_from_rss.py
+
+            test "$(find "${TARGET_DIR}" -maxdepth 1 -type f | wc -l)" -eq 3
+          done
+
+      - name: Verify downloaded files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d xanmod/6.4.10
+          find xanmod/6.4.10 -maxdepth 2 -type f -printf '%P\n' | sort
+
+      - name: Commit and push downloaded packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add xanmod/6.4.10
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "Add XanMod 6.4.10 packages"
+          git push origin HEAD:${GITHUB_REF_NAME}
