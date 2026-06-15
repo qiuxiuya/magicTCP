@@ -82,15 +82,51 @@ install_lotspeed() {
 }
 
 apply_tcp_optimization() {
-    mkdir -p /etc/security/limits.d/
+    mkdir -p /etc/security/limits.d/ /etc/systemd/system.conf.d/ /etc/systemd/user.conf.d/
+
     cat > /etc/security/limits.d/99-network-performance.conf <<EOF
 * soft nofile 1048576
 * hard nofile 1048576
 * soft nproc 65535
 * hard nproc 65535
 EOF
-    ulimit -n "$(ulimit -Hn 2>/dev/null)" 2>/dev/null || true
-    ulimit -u "$(ulimit -Hu 2>/dev/null)" 2>/dev/null || true
+
+    cat > /etc/systemd/system.conf.d/99-network-performance.conf <<EOF
+[Manager]
+DefaultLimitNOFILE=1048576
+DefaultLimitNPROC=65535
+EOF
+
+    cat > /etc/systemd/user.conf.d/99-network-performance.conf <<EOF
+[Manager]
+DefaultLimitNOFILE=1048576
+DefaultLimitNPROC=65535
+EOF
+
+    cat > /etc/profile.d/99-network-performance.sh <<EOF
+#!/bin/sh
+ulimit -n 1048576 2>/dev/null || true
+ulimit -u 65535 2>/dev/null || true
+EOF
+    chmod 644 /etc/profile.d/99-network-performance.sh
+
+    if ! grep -q "network-performance limits" /etc/bash.bashrc 2>/dev/null; then
+        cat >> /etc/bash.bashrc <<'EOF'
+# BEGIN network-performance limits
+if [ -n "${BASH_VERSION:-}" ]; then
+    ulimit -n 1048576 2>/dev/null || true
+    ulimit -u 65535 2>/dev/null || true
+fi
+# END network-performance limits
+EOF
+    fi
+
+    systemctl daemon-reexec 2>/dev/null || true
+
+    ulimit -Hn 1048576 2>/dev/null || true
+    ulimit -Sn 1048576 2>/dev/null || true
+    ulimit -Hu 65535 2>/dev/null || true
+    ulimit -Su 65535 2>/dev/null || true
 
     declare -A params=(
         ["net.ipv4.conf.all.route_localnet"]="1"
@@ -243,7 +279,12 @@ rollback_tcp_optimization() {
         mv /etc/sysctl.conf.bak /etc/sysctl.conf
     fi
 
-    rm -f /etc/security/limits.d/99-network-performance.conf
+    rm -f /etc/security/limits.d/99-network-performance.conf \
+        /etc/systemd/system.conf.d/99-network-performance.conf \
+        /etc/systemd/user.conf.d/99-network-performance.conf \
+        /etc/profile.d/99-network-performance.sh
+    sed -i '/# BEGIN network-performance limits/,/# END network-performance limits/d' /etc/bash.bashrc 2>/dev/null || true
+    systemctl daemon-reexec 2>/dev/null || true
 
     if [ -f /etc/gai.conf.bak ]; then
         mv /etc/gai.conf.bak /etc/gai.conf
@@ -286,7 +327,7 @@ echo "2. Install lotspeed"
 echo "3. Apply TCP optimization"
 echo "4. Optimize NIC queue"
 echo "5. Uninstall other kernel and lotspeed"
-echo "6. Rollback TCP optimization and uninstall lotspeed"
+echo "6. Rollback TCP optimization and uninstall lotspeed cache"
 
 read -p "Please select [1-6]: " num
 
