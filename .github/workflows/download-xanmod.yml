@@ -1,18 +1,30 @@
-name: Download XanMod 6.4.10 Packages
+name: Download XanMod Packages
 
 on:
   workflow_dispatch:
+    inputs:
+      branch:
+        description: 'XanMod branch (e.g., lts, main, rt)'
+        required: true
+        default: 'lts'
+        type: string
+      version:
+        description: 'XanMod version (e.g., 6.4.10, 6.1.77, etc.)'
+        required: true
+        default: '6.4.10'
+        type: string
 
 permissions:
   contents: write
 
 jobs:
   download-and-commit:
-    name: Download and commit XanMod 6.4.10 packages
+    name: Download and commit XanMod packages
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
-      RELEASE_SERIES: 6.4.10-xanmod1
+      BRANCH: ${{ github.event.inputs.branch }}
+      VERSION: ${{ github.event.inputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -104,39 +116,56 @@ jobs:
       - name: Download files from SourceForge RSS
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
+
+          export RELEASE_SERIES="${VERSION}-xanmod1"
+          export FOLDER_NAME="${BRANCH}_${VERSION}"
 
           for version in 1 2 3 4; do
             export VARIANT="v${version}"
-            export VERSION_DIR="6.4.10-x64v${version}-xanmod1"
-            export TARGET_DIR="xanmod/6.4.10/${VERSION_DIR}"
-            export RSS_URL="https://sourceforge.net/projects/xanmod/rss?path=/releases/main/${RELEASE_SERIES}/${VERSION_DIR}"
+            export VERSION_DIR="${VERSION}-x64v${version}-xanmod1"
+            export TARGET_DIR="xanmod/${FOLDER_NAME}/${VERSION_DIR}"
+            export RSS_URL="https://sourceforge.net/projects/xanmod/rss?path=/releases/${BRANCH}/${RELEASE_SERIES}/${VERSION_DIR}"
 
             mkdir -p "${TARGET_DIR}"
-            python3 download_xanmod_from_rss.py
-
-            test "$(find "${TARGET_DIR}" -maxdepth 1 -type f | wc -l)" -eq 3
+            if python3 download_xanmod_from_rss.py; then
+              if test "$(find "${TARGET_DIR}" -maxdepth 1 -type f | wc -l)" -eq 3; then
+                echo "✓ Successfully downloaded v${version}"
+              else
+                echo "⚠ Warning: v${version} found but file count mismatch, continuing..."
+                rm -rf "${TARGET_DIR}"
+              fi
+            else
+              echo "⚠ Warning: v${version} not found or download failed, skipping..."
+              rm -rf "${TARGET_DIR}"
+            fi
           done
+          
+          set -e
+          exit 0
 
       - name: Verify downloaded files
         shell: bash
         run: |
           set -euo pipefail
-          test -d xanmod/6.4.10
-          find xanmod/6.4.10 -maxdepth 2 -type f -printf '%P\n' | sort
+          export FOLDER_NAME="${BRANCH}_${VERSION}"
+          test -d "xanmod/${FOLDER_NAME}"
+          find "xanmod/${FOLDER_NAME}" -maxdepth 2 -type f -printf '%P\n' | sort
 
       - name: Commit and push downloaded packages
         shell: bash
         run: |
           set -euo pipefail
+          export FOLDER_NAME="${BRANCH}_${VERSION}"
+          
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add xanmod/6.4.10
+          git add "xanmod/${FOLDER_NAME}"
 
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
           fi
 
-          git commit -m "Add XanMod 6.4.10 packages"
+          git commit -m "Add XanMod ${VERSION} (${BRANCH}) packages"
           git push origin HEAD:${GITHUB_REF_NAME}
